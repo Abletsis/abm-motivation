@@ -2,9 +2,6 @@ breed [ organisations organisation ]
 breed [ groups group ]
 breed [ individuals individual ]
 
-;to setup-init-market
-; ask organisation [
-
 globals [
   market-trend
   past-trend
@@ -40,11 +37,12 @@ organisations-own [
 
 groups-own [
   organisation-id
-  parent-id
+  level-id
   power
   instrumental-motivation
   normative-motivation
-  average-instrumental-motivation ; list
+  average-instrumental-motivation ; list\
+  lower-lvl-normative
 ]
 
 individuals-own [
@@ -107,6 +105,16 @@ to setup-organisations
     set total-market-size total-market-size + org-size
   ]
 end
+
+to setup-initial-market-trend
+  ask organisations [
+    set investment-decision one-of [ 1 0 ]
+    set effective-market-size ( effective-market-size +  investment-decision * org-size )
+    set total-market-size ( total-market-size + org-size )
+  ]
+  set market-trend effective-market-size / total-market-size
+end
+
 
 to update-istrumental-motivation-organisations
   ask organisations [
@@ -219,6 +227,67 @@ to go
   update-clock
   ifelse ticks < 200 [ tick ] [ stop ]
 end
+
+; each group has a level id and the organisation that they are part of have a total level number.
+; we have agreed that each group at the same level an equal amount of power however power is distributed over the different levels
+; less powerful organisations are positioned in the lower levels of the organisation
+; knowing that a group has a level id, organisation id we are supposed to perform the calculation
+; another note !!! -- THERE IS NO CHECK WHETHER OR NOT THE NORMATIVE-MOTIVATION WILL EXCEED 100
+;;; ----- expensive version ------ ;;;
+to update-normative-motivation-groups-2
+  ask organisations [ ; think about whether or not we would like to add prosociality in there then multiply prosociality as the norm is passed onto the other level
+    let i levels ; the amount of levels the organisation has in its structure
+    while i > 1 [
+      let n-motivation-of-lvl 0
+      let a 0
+      let b 0
+      set b [normative-motivation ] of groups with [ organisation-id = [ who ] of myself and level-id = i ]
+      set a length b
+      set n-motivation-of-lvl int ( reduce + b ) / a
+      let id 0
+      let powers 0
+      ask one-of groups with [ organisation-id = [ who ] of myself  and level-id = 1 ] [ set id who ]
+      set powers [ power ] of group id
+      ask groups with [ organisation-id of myself organisation-id = [ who ] of myself and level-id = ( i - 1 ) ] [
+        set normative-motivation  ( ( 2 - powers ) * normative-motivation + powers * n-motivation-of-lvl ) / 2
+      ]
+    set i i - 1
+    ]
+  ]
+end
+
+
+;; same for normative..
+to update-instrumental-motivation-groups-2
+  ask organisations [
+    let inst-mot instrumental-motivation
+    ask groups with [ organisation-id = [ who ] of myself and level-id = 1 ] [
+      set instrumental-motivation ceiling ( ( instr-mot ) * normative-motivation / 100 )
+    let i 2
+    while i <= levels [
+        ask groups with [ organisation-id = [ who ] of myself and level-id = i ] [
+          set instrumental-motivation  ceiling ( ( one-of [ instrumental-motivation ] of groups with [ organisation-id = organisation-id of myself and level-id ( i - 1 ) ] ) * normative-motivation / 100 )
+          ifelse instrumental-motivation < 1 [ set instrumental-motivation 1 ] [ if instrumental-motivation > 100 [ set instrumental-motivation 100 ] ]
+          set average-instrumental-motivation remove-item 4 average-instrumental-motivation
+          set average-instrumental-motivation insert-item 0 average-instrumental-motivation instrumental-motivation
+        ]
+        set i i + 1
+      ]
+end
+
+;;the normative motivation update for organisations requires to be updated.Why? becasue it should only accept the normative motivation of the groups with level id 1
+to update-normative-motivation-organisations-2
+  ask organisations [
+    let summation-normative-motivations 0
+    let counter 0
+    ask groups with [ organisation-id = [ who ] of myself and level-id = 1 ] [
+      set summation-normative-motivations summation-normative-motivations + normative-motivation
+      set counter counter + 1
+    ]
+    set normative-motivation ( summation-normative-motivations / counter ) * support-sustainable-behaviour * prosociality-group ;; !! NOTE !! we could do something with the investment decision here
+   ifelse normative-motivation < 1 [ set normative-motivation 1 ] [ if normative-motivation > 100 [ set normative-motivation 100 ] ]
+  ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 1798
@@ -283,7 +352,7 @@ sustainability-subsidy
 sustainability-subsidy
 1
 2
-1.7
+0.0
 0.1
 1
 NIL
@@ -298,7 +367,7 @@ legacy-tax
 legacy-tax
 0
 1
-0.7
+0.0
 0.1
 1
 NIL
@@ -313,7 +382,7 @@ support-sustainable-behaviour
 support-sustainable-behaviour
 1
 2
-1.6
+0.0
 0.1
 1
 NIL
@@ -328,7 +397,7 @@ initial-market-trend
 initial-market-trend
 0
 1
-0.5
+0.0
 0.5
 1
 NIL
@@ -343,7 +412,7 @@ number-organisations
 number-organisations
 3
 20
-20.0
+0.0
 1
 1
 NIL
@@ -392,7 +461,7 @@ average-group
 average-group
 1
 40
-30.0
+0.0
 1
 1
 NIL
@@ -422,7 +491,7 @@ investment-threshold
 investment-threshold
 0
 100
-25.0
+0.0
 1
 1
 NIL
@@ -437,7 +506,7 @@ improvement
 improvement
 0
 10
-10.0
+0.0
 1
 1
 NIL
@@ -562,7 +631,7 @@ organisation-memory
 organisation-memory
 0
 40
-30.0
+0.0
 1
 1
 ticks
@@ -595,7 +664,7 @@ demotivate
 demotivate
 0
 10
-5.0
+0.0
 1
 1
 NIL
@@ -628,7 +697,7 @@ variance-normative-motivation
 variance-normative-motivation
 0
 20
-15.0
+0.0
 1
 1
 NIL

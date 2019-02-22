@@ -78,14 +78,13 @@ to update-normative-motivation-organisations
   ask organisations [
     let summation-normative-motivations 0
     let powers 0
-    let counts 0
+    let counter 0
     ask groups with [ organisation-id = [ who ] of myself and level-id = 1 ] [
       set summation-normative-motivations summation-normative-motivations + normative-motivation
-      set counts counts + 1
+      set counter counter + 1
       set powers power
     ]
     set normative-motivation ( ( ( 2 - powers ) * normative-motivation * support-sustainable-behaviour + powers ( summation-normative-motivations / ( counts ) ) * prosociality-group ) / 2 )
-    ;; OR ;; set normative-motivation ( summation-normative-motivations / counts ) * prosociality-group * support-sustainable-behaviour
    ifelse normative-motivation < 1 [ set normative-motivation 1 ] [ if normative-motivation > 100 [ set normative-motivation 100 ] ]
   ]
 end
